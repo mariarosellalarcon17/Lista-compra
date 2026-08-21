@@ -331,7 +331,7 @@
     margin-top:6px;
   }
 
-  /* Comparador de Precios IA */
+  /* Comparador de Precios IA (Groq) */
   .price-compare-card{
     background:var(--card);
     border:1px solid var(--line);
@@ -558,7 +558,7 @@
     </div>
     <div class="cat-title">COMPARATIVA EN DIRECTO CON GROQ AI</div>
     <div id="compare-prices-container"></div>
-    <div class="ai-source-badge" id="compare-legend">⚡ Precios reales consultados en tiempo real con Groq Web Search</div>
+    <div class="ai-source-badge" id="compare-legend">⚡ Precios reales consultados en tiempo real con Groq</div>
   </section>
 
   <!-- Pestaña 5: QR -->
@@ -603,7 +603,7 @@ let state = {
 };
 
 const priceCache = {};
-const LOCAL_KEY = 'lista_compra_custom_v28';
+const LOCAL_KEY = 'lista_compra_custom_v29';
 
 function saveCustomGroqKey(val) {
   if (val) localStorage.setItem(GROQ_KEY_STORAGE, val.trim());
@@ -680,23 +680,25 @@ async function runLiveWebSearch(forceRefresh = false) {
       : `⚡ Buscando el producto de marca blanca para "${parsed.productQuery}"`;
   }
 
-  const prompt = `Consulta y extrae los precios vigentes reales en las webs de supermercados en España (Mercadona, Carrefour, Lidl, Día y Alcampo) para el producto: "${currentItem.name}".
+  const prompt = `Devuelve los precios de mercado en España (Mercadona, Carrefour, Lidl, Día y Alcampo) para el producto: "${currentItem.name}".
 
 Instrucciones:
-1. Si el producto especifica una marca comercial (ej: "Leche marca Pascual"), busca esa marca exacta en cada cadena. Si una tienda no comercializa esa marca, pon available: false y price: null.
-2. Si NO especifica marca comercial, intuye el formato estándar habitual (ej: si es "sal" -> sal de mesa 1kg; si es "huevos" -> docena clase L; si es "leche" -> leche entera 1L) y devuelve el producto de MARCA BLANCA (Hacendado, Carrefour, Milbona/Formil/Cien, Día, Auchan).
+1. Si el producto especifica una marca comercial (ej: "Leche marca Pascual"), busca esa marca exacta en cada cadena. Si una tienda no la comercializa habitualmente, pon available: false y price: null.
+2. Si NO especifica marca comercial, intuye el formato estándar más común (ej: "sal" -> sal de mesa 1kg; "huevos" -> docena clase L; "leche" -> leche 1L) y devuelve el producto de MARCA BLANCA (Hacendado, Carrefour, Milbona/Formil/Cien, Día, Auchan).
 3. Devuelve los precios exactos en euros (€).
 
-Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional:
-[
-  {"store": "Mercadona", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.35},
-  {"store": "Carrefour", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.36},
-  {"store": "Lidl", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.33},
-  {"store": "Día", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.35},
-  {"store": "Alcampo", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.32}
-]`;
+Devuelve un objeto JSON con una clave "prices" que contenga el array con este formato:
+{
+  "prices": [
+    {"store": "Mercadona", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.35},
+    {"store": "Carrefour", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.36},
+    {"store": "Lidl", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.33},
+    {"store": "Día", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.35},
+    {"store": "Alcampo", "brand": "Nombre exacto del producto y marca", "available": true, "price": 0.32}
+  ]
+}`;
 
-  const models = ['groq/compound', 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
+  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
   let resultJson = null;
   let lastError = null;
 
@@ -711,23 +713,18 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicion
         body: JSON.stringify({
           model: model,
           messages: [
-            { role: 'system', content: 'Eres un comparador de precios de supermercados españoles. Devuelves exclusivamente JSON puro estructurado.' },
+            { role: 'system', content: 'Eres un comparador de precios de supermercados en España. Devuelves exclusivamente JSON válido.' },
             { role: 'user', content: prompt }
           ],
+          response_format: { type: "json_object" },
           temperature: 0.1
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        const text = data.choices[0].message.content;
-        let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const start = clean.indexOf('[');
-        const end = clean.lastIndexOf(']');
-        if (start !== -1 && end !== -1 && end > start) {
-          clean = clean.slice(start, end + 1);
-        }
-        resultJson = JSON.parse(clean);
+        const parsedData = JSON.parse(data.choices[0].message.content);
+        resultJson = Array.isArray(parsedData) ? parsedData : (parsedData.prices || Object.values(parsedData)[0]);
         break;
       } else {
         const errJson = await response.json();
@@ -738,7 +735,7 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicion
     }
   }
 
-  if (resultJson) {
+  if (resultJson && Array.isArray(resultJson)) {
     priceCache[itemId] = resultJson;
     renderPriceRows(resultJson);
   } else {
@@ -746,7 +743,7 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicion
       <div class="empty" style="padding:20px 0;">
         <span class="big">⚠️</span>
         <div class="caveat" style="color:var(--brick);">Error al consultar Groq</div>
-        <div style="font-size:0.75rem; color:var(--ink-soft); margin-top:4px;">${escapeHtml(lastError || "No se pudo obtener respuesta")}</div>
+        <div style="font-size:0.75rem; color:var(--ink-soft); margin-top:4px;">${escapeHtml(lastError || "No se pudo obtener una respuesta válida")}</div>
       </div>
     `;
   }
