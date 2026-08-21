@@ -578,7 +578,7 @@
 <script>
 // Clave por defecto opcional (o introdúcela en la interfaz)
 const DEFAULT_GROQ_KEY = "";
-const GROQ_KEY_STORAGE = 'groq_api_key_gsk';
+const GROQ_KEY_STORAGE = 'groq_api_key_gsk_v30';
 
 // Firebase Config
 const firebaseConfig = {
@@ -603,7 +603,7 @@ let state = {
 };
 
 const priceCache = {};
-const LOCAL_KEY = 'lista_compra_custom_v29';
+const LOCAL_KEY = 'lista_compra_custom_v30';
 
 function saveCustomGroqKey(val) {
   if (val) localStorage.setItem(GROQ_KEY_STORAGE, val.trim());
