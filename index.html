@@ -577,7 +577,7 @@
 
 <script>
 const DEFAULT_GROQ_KEY = "";
-const GROQ_KEY_STORAGE = 'groq_api_key_gsk_v31';
+const GROQ_KEY_STORAGE = 'groq_api_key_gsk_v32';
 
 // Firebase Config
 const firebaseConfig = {
@@ -602,7 +602,7 @@ let state = {
 };
 
 const priceCache = {};
-const LOCAL_KEY = 'lista_compra_custom_v31';
+const LOCAL_KEY = 'lista_compra_custom_v32';
 
 function saveCustomGroqKey(val) {
   if (val) localStorage.setItem(GROQ_KEY_STORAGE, val.trim());
@@ -631,24 +631,6 @@ function parseItemBrand(fullName) {
     brandQuery: null,
     productQuery: fullName.trim()
   };
-}
-
-async function getAvailableGroqModel(apiKey) {
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const list = data.data.map(m => m.id);
-      const preferred = list.find(id => id.includes('llama-3.3-70b') || id.includes('llama3-70b'));
-      if (preferred) return preferred;
-      const anyLlama = list.find(id => id.includes('llama') && !id.includes('guard'));
-      if (anyLlama) return anyLlama;
-      if (list.length > 0) return list[0];
-    }
-  } catch (e) {}
-  return 'llama-3.3-70b-versatile';
 }
 
 async function runLiveWebSearch(forceRefresh = false) {
@@ -719,7 +701,6 @@ Devuelve un objeto JSON con una clave "prices" que contenga el array con este fo
   let lastError = null;
 
   try {
-    const selectedModel = await getAvailableGroqModel(apiKey);
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -727,7 +708,7 @@ Devuelve un objeto JSON con una clave "prices" que contenga el array con este fo
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: selectedModel,
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: 'Eres un comparador de precios de supermercados en España. Devuelves exclusivamente JSON válido.' },
           { role: 'user', content: prompt }
